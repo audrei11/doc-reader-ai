@@ -118,7 +118,7 @@ RULES YOU MUST FOLLOW:
 
   while (true) {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: currentMessages,
       tools,
       tool_choice: "auto",
