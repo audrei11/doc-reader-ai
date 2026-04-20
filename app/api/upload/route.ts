@@ -26,22 +26,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { text, pageCount } = result;
+    const { text, pageCount, columns, rows } = result;
 
     if (!text || text.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Could not extract text from file." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Could not extract text from file." }, { status: 400 });
     }
 
     const filename = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
 
     const dbResult = await sql`
-      INSERT INTO documents (filename, original_name, content, file_size, page_count)
-      VALUES (${filename}, ${file.name}, ${text}, ${file.size}, ${pageCount})
+      INSERT INTO documents (filename, original_name, content, file_size, page_count, columns)
+      VALUES (${filename}, ${file.name}, ${text}, ${file.size}, ${pageCount}, ${columns ?? null})
       RETURNING id, original_name, page_count, uploaded_at
     `;
+
+    const docId = dbResult[0].id as number;
+
+    if (rows && rows.length > 0) {
+      for (let i = 0; i < rows.length; i++) {
+        await sql`
+          INSERT INTO document_data (document_id, row_index, data)
+          VALUES (${docId}, ${i}, ${JSON.stringify(rows[i])})
+        `;
+      }
+    }
 
     return NextResponse.json({ success: true, document: dbResult[0] });
   } catch (err) {

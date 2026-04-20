@@ -31,9 +31,21 @@ async function main() {
       content TEXT NOT NULL,
       file_size INTEGER,
       page_count INTEGER,
+      columns TEXT[],
       uploaded_at TIMESTAMP DEFAULT NOW()
     )
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS document_data (
+      id SERIAL PRIMARY KEY,
+      document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+      row_index INTEGER,
+      data JSONB
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_document_data_doc_id ON document_data(document_id)`;
 
   console.log("✅ Database setup complete!");
   process.exit(0);
