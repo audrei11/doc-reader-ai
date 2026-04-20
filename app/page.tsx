@@ -40,8 +40,9 @@ export default function Home() {
   }
 
   async function handleUpload(file: File) {
-    if (!file.name.endsWith(".pdf")) {
-      alert("Only PDF files are supported.");
+    const supported = [".pdf", ".docx", ".xlsx", ".xls", ".csv", ".txt"];
+    if (!supported.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+      alert("Supported: PDF, DOCX, XLSX, CSV, TXT");
       return;
     }
     setUploading(true);
@@ -130,7 +131,7 @@ export default function Home() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.docx,.xlsx,.xls,.csv,.txt"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -149,7 +150,8 @@ export default function Home() {
             ) : (
               <>
                 <div className="text-2xl mb-2">📄</div>
-                <p className="text-sm text-gray-400">Drop PDF here</p>
+                <p className="text-sm text-gray-400">Drop file here</p>
+                <p className="text-xs text-gray-600 mt-0.5">PDF, DOCX, XLSX, CSV, TXT</p>
                 <p className="text-xs text-gray-600 mt-1">or click to browse</p>
               </>
             )}
