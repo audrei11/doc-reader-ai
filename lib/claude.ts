@@ -64,7 +64,12 @@ async function executeTool(toolName: string, toolInput: Record<string, unknown>)
     `;
     if (docs.length === 0) return `Document with ID ${id} not found.`;
     const doc = docs[0];
-    return `Document: ${doc.original_name}\nPages: ${doc.page_count}\n\n--- CONTENT ---\n${doc.content}`;
+    const content = doc.content as string;
+    const MAX_CHARS = 25000;
+    const truncated = content.length > MAX_CHARS
+      ? content.slice(0, MAX_CHARS) + `\n\n[... document continues, ${content.length - MAX_CHARS} more characters. Use search_in_document to find specific sections.]`
+      : content;
+    return `Document: ${doc.original_name}\nPages: ${doc.page_count}\n\n--- CONTENT ---\n${truncated}`;
   }
 
   if (toolName === "search_in_document") {
@@ -103,9 +108,10 @@ export async function chat(messages: OpenAI.Chat.ChatCompletionMessageParam[]): 
 RULES YOU MUST FOLLOW:
 1. ALWAYS call list_documents first at the start of EVERY conversation to see what documents are available.
 2. NEVER say you don't have access to documents — always check using your tools first.
-3. When the user asks anything about a document, calculations, or content — immediately use read_document or search_in_document.
-4. Do NOT ask the user to upload or share anything. The documents are already in the system — use your tools to find them.
-5. Answer based ONLY on what you read from the documents. Do not guess.`,
+3. When the user asks anything about a document — immediately use search_in_document with relevant keywords first. Only use read_document if search doesn't give enough context.
+4. For follow-up or "expand" questions — use search_in_document with specific keywords from the topic being discussed. Do NOT re-read the full document.
+5. Do NOT ask the user to upload or share anything. The documents are already in the system — use your tools to find them.
+6. Answer based ONLY on what you read from the documents. Do not guess.`,
   };
 
   const currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [systemMessage, ...messages];
