@@ -15,6 +15,28 @@ interface Message {
   content: string;
 }
 
+function FileIcon({ name }: { name: string }) {
+  const ext = name.split(".").pop()?.toLowerCase();
+  const map: Record<string, { label: string; color: string }> = {
+    pdf: { label: "PDF", color: "#ff6b6b" },
+    docx: { label: "DOC", color: "#74b9ff" },
+    doc: { label: "DOC", color: "#74b9ff" },
+    xlsx: { label: "XLS", color: "#55efc4" },
+    xls: { label: "XLS", color: "#55efc4" },
+    csv: { label: "CSV", color: "#fdcb6e" },
+    txt: { label: "TXT", color: "#a29bfe" },
+  };
+  const info = map[ext || ""] || { label: "FILE", color: "#a29bfe" };
+  return (
+    <span
+      className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+      style={{ background: info.color + "20", color: info.color, letterSpacing: "0.05em" }}
+    >
+      {info.label}
+    </span>
+  );
+}
+
 export default function Home() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -25,10 +47,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
+  useEffect(() => { fetchDocuments(); }, []);
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
@@ -50,11 +69,8 @@ export default function Home() {
     form.append("file", file);
     const res = await fetch("/api/upload", { method: "POST", body: form });
     const data = await res.json();
-    if (data.success) {
-      await fetchDocuments();
-    } else {
-      alert(data.error || "Upload failed.");
-    }
+    if (data.success) await fetchDocuments();
+    else alert(data.error || "Upload failed.");
     setUploading(false);
   }
 
@@ -70,29 +86,21 @@ export default function Home() {
   async function sendMessage() {
     const text = input.trim();
     if (!text || thinking) return;
-
     const newMessages: Message[] = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
     setInput("");
     setThinking(true);
-
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: newMessages }),
     });
-
     const data = await res.json();
     setThinking(false);
-
-    if (data.reply) {
-      setMessages([...newMessages, { role: "assistant", content: data.reply }]);
-    } else {
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: "Sorry, something went wrong." },
-      ]);
-    }
+    setMessages([
+      ...newMessages,
+      { role: "assistant", content: data.reply || "Sorry, something went wrong." },
+    ]);
   }
 
   function formatSize(bytes: number) {
@@ -101,22 +109,41 @@ export default function Home() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gradient-radial">
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed top-0 left-64 w-96 h-96 bg-accent opacity-5 rounded-full blur-3xl" />
+      <div className="pointer-events-none fixed bottom-0 right-0 w-80 h-80 bg-purple-600 opacity-5 rounded-full blur-3xl" />
+
       {/* Sidebar */}
-      <aside className="w-72 flex-shrink-0 flex flex-col bg-panel border-r border-border">
-        <div className="p-5 border-b border-border">
-          <h1 className="text-lg font-semibold text-white tracking-tight">DocReader AI</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Chat with your documents</p>
+      <aside className="w-72 flex-shrink-0 flex flex-col glass border-r border-border relative z-10">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center shadow-lg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-white tracking-tight">DocReader AI</h1>
+              <p className="text-[10px] text-gray-500">Powered by GPT-4o mini</p>
+            </div>
+          </div>
         </div>
 
         {/* Upload */}
         <div className="p-4 border-b border-border">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Upload Document</p>
           <div
-            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
+            className={`relative border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all duration-300 ${
               dragOver
-                ? "border-accent bg-accent/10"
-                : "border-border hover:border-accent/50 hover:bg-white/5"
+                ? "border-accent bg-accent-soft scale-[0.99]"
+                : "border-border hover:border-accent/40 hover:bg-white/[0.02]"
             }`}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -140,98 +167,150 @@ export default function Home() {
               }}
             />
             {uploading ? (
-              <div className="flex items-center justify-center gap-2 text-accent">
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                <span className="text-sm">Uploading...</span>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+                <span className="text-xs text-accent font-medium">Uploading...</span>
               </div>
             ) : (
               <>
-                <div className="text-2xl mb-2">📄</div>
-                <p className="text-sm text-gray-400">Drop file here</p>
-                <p className="text-xs text-gray-600 mt-0.5">PDF, DOCX, XLSX, CSV, TXT</p>
-                <p className="text-xs text-gray-600 mt-1">or click to browse</p>
+                <div className="w-10 h-10 rounded-xl bg-accent-soft flex items-center justify-center mx-auto mb-3">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-gray-300">Drop file here</p>
+                <p className="text-[10px] text-gray-600 mt-1">PDF · DOCX · XLSX · CSV · TXT</p>
               </>
             )}
           </div>
         </div>
 
         {/* Document list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {documents.length === 0 ? (
-            <p className="text-xs text-gray-600 text-center py-4">No documents yet</p>
-          ) : (
-            documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="group bg-surface rounded-lg p-3 border border-border hover:border-accent/40 transition-all"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-medium truncate">{doc.original_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {doc.page_count} pages · {formatSize(doc.file_size)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(doc.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs p-1"
-                  >
-                    ✕
-                  </button>
-                </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Documents</p>
+            {documents.length > 0 && (
+              <span className="text-[10px] bg-accent-soft text-accent px-2 py-0.5 rounded-full font-medium">
+                {documents.length}
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            {documents.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-3xl mb-2 opacity-20">📂</div>
+                <p className="text-[11px] text-gray-600">No documents yet</p>
               </div>
-            ))
-          )}
+            ) : (
+              documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="group relative rounded-xl p-3 border border-border hover:border-border-light hover:bg-white/[0.03] transition-all duration-200"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <FileIcon name={doc.original_name} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-200 font-medium truncate leading-tight">{doc.original_name}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">
+                        {doc.page_count} pages · {formatSize(doc.file_size)} · {formatDate(doc.uploaded_at)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-700 hover:text-red-400 transition-all p-0.5 flex-shrink-0"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </aside>
 
-      {/* Chat */}
-      <main className="flex-1 flex flex-col min-w-0">
+      {/* Chat Area */}
+      <main className="flex-1 flex flex-col min-w-0 relative">
+        {/* Header */}
+        <header className="px-6 py-4 border-b border-border glass flex items-center justify-between relative z-10">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Document Chat</h2>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {documents.length === 0 ? "Upload a document to get started" : `${documents.length} document${documents.length > 1 ? "s" : ""} ready`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] text-gray-500">Online</span>
+          </div>
+        </header>
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center opacity-40">
-              <div className="text-5xl mb-4">💬</div>
-              <p className="text-lg font-medium text-white">Ask anything about your documents</p>
-              <p className="text-sm text-gray-500 mt-1">Upload a PDF and start chatting</p>
+            <div className="flex flex-col items-center justify-center h-full text-center select-none">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-accent flex items-center justify-center mx-auto mb-5 shadow-lg glow">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Ask anything about your documents</h3>
+              <p className="text-sm text-gray-500 max-w-sm">Upload a PDF, spreadsheet, or document — then ask questions, calculate totals, or search for specific data.</p>
+              <div className="mt-6 grid grid-cols-2 gap-2 max-w-sm w-full">
+                {[
+                  "What is the total amount?",
+                  "Summarize this document",
+                  "Find mentions of [keyword]",
+                  "Calculate average salary",
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setInput(suggestion)}
+                    className="text-left text-[11px] text-gray-400 border border-border hover:border-accent/40 hover:text-gray-200 rounded-lg px-3 py-2 transition-all duration-200 hover:bg-accent-soft"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
+            <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-xs mr-3 flex-shrink-0 mt-1">
+                <div className="w-8 h-8 rounded-xl bg-gradient-accent flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5 shadow-md">
                   AI
                 </div>
               )}
               <div
-                className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`max-w-xl text-sm leading-relaxed whitespace-pre-wrap ${
                   msg.role === "user"
-                    ? "bg-accent text-white rounded-br-sm"
-                    : "bg-panel border border-border text-gray-200 rounded-bl-sm"
+                    ? "bg-gradient-accent text-white px-4 py-3 rounded-2xl rounded-br-sm shadow-lg"
+                    : "glass px-4 py-3 rounded-2xl rounded-bl-sm text-gray-200"
                 }`}
               >
                 {msg.content}
               </div>
+              {msg.role === "user" && (
+                <div className="w-8 h-8 rounded-xl bg-panel-light border border-border flex items-center justify-center text-[11px] font-bold text-gray-400 flex-shrink-0 mt-0.5">
+                  U
+                </div>
+              )}
             </div>
           ))}
 
           {thinking && (
-            <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-xs mr-3 flex-shrink-0 mt-1">
+            <div className="flex gap-3 justify-start">
+              <div className="w-8 h-8 rounded-xl bg-gradient-accent flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5 shadow-md">
                 AI
               </div>
-              <div className="bg-panel border border-border rounded-2xl rounded-bl-sm px-4 py-3">
-                <div className="flex gap-1.5 items-center">
-                  <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="glass px-4 py-3 rounded-2xl rounded-bl-sm">
+                <div className="dot-pulse flex gap-1.5 items-center">
+                  <span className="w-1.5 h-1.5 bg-accent rounded-full block" />
+                  <span className="w-1.5 h-1.5 bg-accent rounded-full block" />
+                  <span className="w-1.5 h-1.5 bg-accent rounded-full block" />
                 </div>
               </div>
             </div>
@@ -241,32 +320,37 @@ export default function Home() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-border bg-panel">
-          <div className="flex gap-3 items-end">
-            <textarea
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-accent transition-colors"
-              placeholder="Ask about your document..."
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              style={{ maxHeight: "120px", overflowY: "auto" }}
-            />
+        <div className="px-6 py-4 border-t border-border glass relative z-10">
+          <div className="flex gap-3 items-end max-w-4xl mx-auto">
+            <div className="flex-1 relative">
+              <textarea
+                className="w-full bg-panel-light border border-border rounded-2xl px-4 py-3 pr-4 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-accent/50 focus:bg-white/[0.03] transition-all duration-200"
+                placeholder="Ask about your documents..."
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                style={{ maxHeight: "120px", overflowY: "auto" }}
+              />
+            </div>
             <button
               onClick={sendMessage}
               disabled={thinking || !input.trim()}
-              className="bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl px-5 py-3 text-sm font-medium transition-all flex-shrink-0"
+              className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-accent hover:opacity-90 disabled:opacity-25 disabled:cursor-not-allowed text-white transition-all duration-200 flex items-center justify-center shadow-lg"
             >
-              Send
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
             </button>
           </div>
-          <p className="text-xs text-gray-700 mt-2 text-center">
-            Press Enter to send · Shift+Enter for new line
+          <p className="text-[10px] text-gray-700 mt-2 text-center">
+            Enter to send · Shift+Enter for new line
           </p>
         </div>
       </main>
