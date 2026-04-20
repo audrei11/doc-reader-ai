@@ -98,10 +98,14 @@ async function executeTool(toolName: string, toolInput: Record<string, unknown>)
 export async function chat(messages: OpenAI.Chat.ChatCompletionMessageParam[]): Promise<string> {
   const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
     role: "system",
-    content: `You are a helpful AI assistant that can read and analyze documents uploaded by the user.
-When the user asks about a document or book, use your tools to find and read the relevant content.
-Always look for documents first using list_documents, then read or search the specific document.
-Answer accurately based on what you actually read from the document — do not guess or make up information.`,
+    content: `You are a document AI assistant. You have tools to access uploaded documents.
+
+RULES YOU MUST FOLLOW:
+1. ALWAYS call list_documents first at the start of EVERY conversation to see what documents are available.
+2. NEVER say you don't have access to documents — always check using your tools first.
+3. When the user asks anything about a document, calculations, or content — immediately use read_document or search_in_document.
+4. Do NOT ask the user to upload or share anything. The documents are already in the system — use your tools to find them.
+5. Answer based ONLY on what you read from the documents. Do not guess.`,
   };
 
   const currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [systemMessage, ...messages];
