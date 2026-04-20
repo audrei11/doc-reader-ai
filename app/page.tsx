@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { SplineScene } from "@/components/ui/splite";
 
 interface Document {
   id: number;
@@ -189,11 +190,25 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Documents</p>
-            {documents.length > 0 && (
-              <span className="text-[10px] bg-accent-soft text-accent px-2 py-0.5 rounded-full font-medium">
-                {documents.length}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {documents.length > 0 && (
+                <>
+                  <span className="text-[10px] bg-accent-soft text-accent px-2 py-0.5 rounded-full font-medium">
+                    {documents.length}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Delete all documents?")) return;
+                      await Promise.all(documents.map(d => fetch("/api/files", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: d.id }) })));
+                      await fetchDocuments();
+                    }}
+                    className="text-[10px] text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             {documents.length === 0 ? (
@@ -217,7 +232,7 @@ export default function Home() {
                     </div>
                     <button
                       onClick={() => handleDelete(doc.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-700 hover:text-red-400 transition-all p-0.5 flex-shrink-0"
+                      className="text-gray-500 hover:text-red-400 transition-all p-0.5 flex-shrink-0"
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -232,7 +247,18 @@ export default function Home() {
       </aside>
 
       {/* Chat Area */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
+      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
+
+        {/* Spline full background */}
+        <div className="absolute inset-0 z-0">
+          <SplineScene
+            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+            className="w-full h-full"
+          />
+          {/* Dark overlay so text is readable */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(8,8,16,0.72)" }} />
+        </div>
+
         {/* Header */}
         <header className="px-6 py-4 border-b border-border glass flex items-center justify-between relative z-10">
           <div>
@@ -248,29 +274,21 @@ export default function Home() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 relative z-10">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center select-none">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-accent flex items-center justify-center mx-auto mb-5 shadow-lg glow">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+            <div className="flex flex-col items-center justify-center h-full text-center select-none py-20">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-accent flex items-center justify-center mb-5 shadow-lg glow mx-auto">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
                   <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Ask anything about your documents</h3>
-              <p className="text-sm text-gray-500 max-w-sm">Upload a PDF, spreadsheet, or document — then ask questions, calculate totals, or search for specific data.</p>
-              <div className="mt-6 grid grid-cols-2 gap-2 max-w-sm w-full">
-                {[
-                  "What is the total amount?",
-                  "Summarize this document",
-                  "Find mentions of [keyword]",
-                  "Calculate average salary",
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => setInput(suggestion)}
-                    className="text-left text-[11px] text-gray-400 border border-border hover:border-accent/40 hover:text-gray-200 rounded-lg px-3 py-2 transition-all duration-200 hover:bg-accent-soft"
-                  >
-                    {suggestion}
+              <h3 className="text-2xl font-bold text-white mb-2">Ask anything about your documents</h3>
+              <p className="text-sm text-gray-400 max-w-sm mb-6">Upload a PDF, spreadsheet, or document — ask questions, calculate totals, or search for data.</p>
+              <div className="grid grid-cols-2 gap-2 max-w-sm w-full">
+                {["What is the total amount?","Summarize this document","Find mentions of [keyword]","Calculate average salary"].map((s) => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-left text-xs text-gray-400 border border-border hover:border-accent/40 hover:text-gray-200 rounded-lg px-3 py-2 transition-all hover:bg-accent-soft backdrop-blur-sm">
+                    {s}
                   </button>
                 ))}
               </div>
@@ -284,13 +302,11 @@ export default function Home() {
                   AI
                 </div>
               )}
-              <div
-                className={`max-w-xl text-sm leading-relaxed whitespace-pre-wrap ${
-                  msg.role === "user"
-                    ? "bg-gradient-accent text-white px-4 py-3 rounded-2xl rounded-br-sm shadow-lg"
-                    : "glass px-4 py-3 rounded-2xl rounded-bl-sm text-gray-200"
-                }`}
-              >
+              <div className={`max-w-xl text-sm leading-relaxed whitespace-pre-wrap ${
+                msg.role === "user"
+                  ? "bg-gradient-accent text-white px-4 py-3 rounded-2xl rounded-br-sm shadow-lg"
+                  : "glass px-4 py-3 rounded-2xl rounded-bl-sm text-gray-200"
+              }`}>
                 {msg.content}
               </div>
               {msg.role === "user" && (
@@ -303,9 +319,7 @@ export default function Home() {
 
           {thinking && (
             <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-xl bg-gradient-accent flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5 shadow-md">
-                AI
-              </div>
+              <div className="w-8 h-8 rounded-xl bg-gradient-accent flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5 shadow-md">AI</div>
               <div className="glass px-4 py-3 rounded-2xl rounded-bl-sm">
                 <div className="dot-pulse flex gap-1.5 items-center">
                   <span className="w-1.5 h-1.5 bg-accent rounded-full block" />
@@ -315,13 +329,12 @@ export default function Home() {
               </div>
             </div>
           )}
-
           <div ref={chatEndRef} />
         </div>
 
         {/* Input */}
         <div className="px-6 py-4 border-t border-border glass relative z-10">
-          <div className="flex gap-3 items-end max-w-4xl mx-auto">
+          <div className="flex gap-3 items-end max-w-3xl mx-auto">
             <div className="flex-1 relative">
               <textarea
                 className="w-full bg-panel-light border border-border rounded-2xl px-4 py-3 pr-4 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-accent/50 focus:bg-white/[0.03] transition-all duration-200"

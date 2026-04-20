@@ -47,6 +47,9 @@ async function main() {
 
   await sql`CREATE INDEX IF NOT EXISTS idx_document_data_doc_id ON document_data(document_id)`;
 
+  // Add columns column if missing (for existing tables)
+  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS columns TEXT[]`;
+
   console.log("✅ Database setup complete!");
   process.exit(0);
 }
