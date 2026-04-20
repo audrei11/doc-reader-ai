@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { SplineScene } from "@/components/ui/splite";
+import { Spotlight } from "@/components/ui/spotlight";
 
 interface Document {
   id: number;
@@ -251,6 +252,7 @@ export default function Home() {
 
         {/* Spline full background */}
         <div className="absolute inset-0 z-0">
+          <Spotlight size={600} />
           <SplineScene
             scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
             className="w-full h-full"
@@ -333,7 +335,7 @@ export default function Home() {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 border-t border-border glass relative z-10">
+        <div className="flex-shrink-0 px-6 py-4 border-t border-border glass relative z-10">
           <div className="flex gap-3 items-end max-w-3xl mx-auto">
             <div className="flex-1 relative">
               <textarea

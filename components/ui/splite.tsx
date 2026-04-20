@@ -22,7 +22,32 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
 
     init().catch(console.error)
 
+    function forwardPointer(e: PointerEvent) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      canvas.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: false,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        movementX: e.movementX,
+        movementY: e.movementY,
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        isPrimary: e.isPrimary,
+      }))
+      canvas.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: false,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      }))
+    }
+
+    window.addEventListener('pointermove', forwardPointer)
+
     return () => {
+      window.removeEventListener('pointermove', forwardPointer)
       if (app?.dispose) app.dispose()
     }
   }, [scene])

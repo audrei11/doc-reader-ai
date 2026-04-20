@@ -1,69 +1,54 @@
-'use client';
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
-import { cn } from '@/lib/utils';
+'use client'
+import { useEffect, useRef, useState } from 'react'
+import { motion, useSpring, useTransform } from 'framer-motion'
 
 type SpotlightProps = {
-  className?: string;
-  size?: number;
-};
+  size?: number
+}
 
-export function Spotlight({ className, size = 400 }: SpotlightProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [parentElement, setParentElement] = useState<HTMLElement | null>(null);
+export function Spotlight({ size = 600 }: SpotlightProps) {
+  const [visible, setVisible] = useState(false)
+  const mouseX = useSpring(0, { bounce: 0, stiffness: 300, damping: 30 })
+  const mouseY = useSpring(0, { bounce: 0, stiffness: 300, damping: 30 })
 
-  const mouseX = useSpring(0, { bounce: 0 });
-  const mouseY = useSpring(0, { bounce: 0 });
+  const left = useTransform(mouseX, (x) => `${x - size / 2}px`)
+  const top = useTransform(mouseY, (y) => `${y - size / 2}px`)
 
-  const spotlightLeft = useTransform(mouseX, (x) => `${x - size / 2}px`);
-  const spotlightTop = useTransform(mouseY, (y) => `${y - size / 2}px`);
+  const parentRef = useRef<HTMLElement | null>(null)
+  const divRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (containerRef.current) {
-      const parent = containerRef.current.parentElement;
-      if (parent) {
-        parent.style.position = 'relative';
-        parent.style.overflow = 'hidden';
-        setParentElement(parent);
-      }
+    // Track relative to our parent container (already positioned)
+    const parent = divRef.current?.parentElement
+    if (parent) parentRef.current = parent
+
+    function onMove(e: MouseEvent) {
+      const p = parentRef.current
+      if (!p) return
+      const rect = p.getBoundingClientRect()
+      mouseX.set(e.clientX - rect.left)
+      mouseY.set(e.clientY - rect.top)
     }
-  }, []);
 
-  const handleMouseMove = useCallback(
-    (event: MouseEvent) => {
-      if (!parentElement) return;
-      const { left, top } = parentElement.getBoundingClientRect();
-      mouseX.set(event.clientX - left);
-      mouseY.set(event.clientY - top);
-    },
-    [mouseX, mouseY, parentElement]
-  );
-
-  useEffect(() => {
-    if (!parentElement) return;
-    const onEnter = () => setIsHovered(true);
-    const onLeave = () => setIsHovered(false);
-    parentElement.addEventListener('mousemove', handleMouseMove);
-    parentElement.addEventListener('mouseenter', onEnter);
-    parentElement.addEventListener('mouseleave', onLeave);
-    return () => {
-      parentElement.removeEventListener('mousemove', handleMouseMove);
-      parentElement.removeEventListener('mouseenter', onEnter);
-      parentElement.removeEventListener('mouseleave', onLeave);
-    };
-  }, [parentElement, handleMouseMove]);
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseenter', () => setVisible(true))
+    window.addEventListener('mousemove', () => setVisible(true))
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [mouseX, mouseY])
 
   return (
     <motion.div
-      ref={containerRef}
-      className={cn(
-        'pointer-events-none absolute rounded-full blur-3xl transition-opacity duration-300',
-        'bg-[radial-gradient(circle_at_center,rgba(108,92,231,0.3),transparent_70%)]',
-        isHovered ? 'opacity-100' : 'opacity-0',
-        className
-      )}
-      style={{ width: size, height: size, left: spotlightLeft, top: spotlightTop }}
+      ref={divRef}
+      className="pointer-events-none absolute rounded-full z-10"
+      animate={{ opacity: visible ? 1 : 0 }}
+      style={{
+        width: size,
+        height: size,
+        left,
+        top,
+        background: 'radial-gradient(circle at center, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.07) 40%, transparent 70%)',
+        filter: 'blur(24px)',
+      }}
     />
-  );
+  )
 }
