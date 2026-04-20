@@ -1,65 +1,57 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { sql } from "./db";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-const tools: Anthropic.Tool[] = [
+const tools: OpenAI.Chat.ChatCompletionTool[] = [
   {
-    name: "list_documents",
-    description: "List all uploaded documents/PDFs available in the database.",
-    input_schema: {
-      type: "object" as const,
-      properties: {},
-      required: [],
+    type: "function",
+    function: {
+      name: "list_documents",
+      description: "List all uploaded documents/PDFs available in the database.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
-    name: "read_document",
-    description:
-      "Read the full text content of a specific document by its ID or filename. Use this to answer questions about a document.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        document_id: {
-          type: "number",
-          description: "The ID of the document to read",
+    type: "function",
+    function: {
+      name: "read_document",
+      description:
+        "Read the full text content of a specific document by its ID. Use this to answer questions about a document.",
+      parameters: {
+        type: "object",
+        properties: {
+          document_id: { type: "number", description: "The ID of the document to read" },
         },
+        required: ["document_id"],
       },
-      required: ["document_id"],
     },
   },
   {
-    name: "search_in_document",
-    description:
-      "Search for a specific keyword or phrase inside a document. Returns surrounding context of matches.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        document_id: {
-          type: "number",
-          description: "The ID of the document to search in",
+    type: "function",
+    function: {
+      name: "search_in_document",
+      description:
+        "Search for a specific keyword or phrase inside a document. Returns surrounding context of matches.",
+      parameters: {
+        type: "object",
+        properties: {
+          document_id: { type: "number", description: "The ID of the document to search in" },
+          keyword: { type: "string", description: "The keyword or phrase to search for" },
         },
-        keyword: {
-          type: "string",
-          description: "The keyword or phrase to search for",
-        },
+        required: ["document_id", "keyword"],
       },
-      required: ["document_id", "keyword"],
     },
   },
 ];
 
-async function executeTool(
-  toolName: string,
-  toolInput: Record<string, unknown>
-): Promise<string> {
+async function executeTool(toolName: string, toolInput: Record<string, unknown>): Promise<string> {
   if (toolName === "list_documents") {
     const docs = await sql`
       SELECT id, original_name, page_count, file_size, uploaded_at
-      FROM documents
-      ORDER BY uploaded_at DESC
+      FROM documents ORDER BY uploaded_at DESC
     `;
     if (docs.length === 0) return "No documents uploaded yet.";
     return JSON.stringify(docs, null, 2);
@@ -96,63 +88,52 @@ async function executeTool(
       pos += kw.length;
     }
 
-    if (matches.length === 0)
-      return `Keyword "${keyword}" not found in document.`;
+    if (matches.length === 0) return `Keyword "${keyword}" not found in document.`;
     return `Found ${matches.length} match(es) for "${keyword}":\n\n${matches.join("\n\n---\n\n")}`;
   }
 
   return "Unknown tool.";
 }
 
-export async function chat(
-  messages: Anthropic.MessageParam[]
-): Promise<string> {
-  let currentMessages = [...messages];
-
-  while (true) {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8096,
-      system: `You are a helpful AI assistant that can read and analyze documents uploaded by the user.
+export async function chat(messages: OpenAI.Chat.ChatCompletionMessageParam[]): Promise<string> {
+  const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
+    role: "system",
+    content: `You are a helpful AI assistant that can read and analyze documents uploaded by the user.
 When the user asks about a document or book, use your tools to find and read the relevant content.
 Always look for documents first using list_documents, then read or search the specific document.
 Answer accurately based on what you actually read from the document — do not guess or make up information.`,
-      tools,
+  };
+
+  const currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [systemMessage, ...messages];
+
+  while (true) {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: currentMessages,
+      tools,
+      tool_choice: "auto",
     });
 
-    if (response.stop_reason === "end_turn") {
-      const textBlock = response.content.find((b) => b.type === "text");
-      return textBlock ? (textBlock as Anthropic.TextBlock).text : "";
+    const choice = response.choices[0];
+
+    if (choice.finish_reason === "stop") {
+      return choice.message.content ?? "";
     }
 
-    if (response.stop_reason === "tool_use") {
-      const assistantMessage: Anthropic.MessageParam = {
-        role: "assistant",
-        content: response.content,
-      };
-      currentMessages.push(assistantMessage);
+    if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
+      currentMessages.push(choice.message);
 
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      for (const toolCall of choice.message.tool_calls) {
+        if (toolCall.type !== "function") continue;
+        const toolInput = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+        const result = await executeTool(toolCall.function.name, toolInput);
 
-      for (const block of response.content) {
-        if (block.type === "tool_use") {
-          const result = await executeTool(
-            block.name,
-            block.input as Record<string, unknown>
-          );
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
+        currentMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: result,
+        });
       }
-
-      currentMessages.push({
-        role: "user",
-        content: toolResults,
-      });
 
       continue;
     }
